@@ -1,0 +1,47 @@
+# -*- mode: snippet; require-final-newline: nil -*-
+# name: Markdown API documentation
+# key: apidoc
+# binding: direct-keybinding
+# --
+** $1 **
+----
+$0
+
+* **URL**
+
+
+* **Method:**
+  
+
+*  **URL Params**
+
+   **Required:**
+ 
+
+   **Optional:**
+ 
+
+* **Data Params**
+
+
+* **Success Response:**
+  
+
+  * **Code:** 200 <br />
+    **Content:**
+ 
+* **Error Response:**
+
+  * **Code:** <br />
+    **Content:**
+
+  OR
+
+  * **Code:**  <br />
+    **Content:** 
+
+* **Sample Call:**
+
+
+* **Notes:**
+

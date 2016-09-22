@@ -1,0 +1,7 @@
+auto-save-list/
+local.el
+*~
+.#*
+ac-comphist.dat
+bookmarks
+ido.last
