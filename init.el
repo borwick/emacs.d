@@ -45,14 +45,31 @@
       (when (not (require 'magit nil t))
 	(package-refresh-contents)
 	(package-install 'magit))
+      (when (not (require 'magit-gitflow nil t))
+	(package-refresh-contents)
+	(package-install 'magit-gitflow))
       (when (not (require 'puppet-mode nil t))
 	(package-refresh-contents)
 	(package-install 'puppet-mode))
       (when (not (require 'yaml-mode nil t))
 	(package-refresh-contents)
 	(package-install 'yaml-mode))
+      (when (not (require 'edit-server nil t))
+	(package-refresh-contents)
+	(package-install 'edit-server))
+      (when (not (require 'helm nil t))
+	(package-refresh-contents)
+	(package-install 'helm))
+      (when (not (require 'org-bullets nil t))
+	(package-refresh-contents)
+	(package-install 'org-bullets))
+      (when (not (require 'highlight nil t))
+	(package-refresh-contents)
+	(package-install 'highlight))
+      ;; (when (not (require 'org-journal nil t))
+      ;; 	(package-refresh-contents)
+      ;; 	(package-install 'org-journal))
       ))
-
 
 
 ; custom files for M-x customize
@@ -64,9 +81,17 @@
       inhibit-startup-echo-area-message t)
 
 ; completion thing
-(ido-mode 1)
-(setq ido-enable-flex-matching t)
-(setq ido-everywhere t)
+; (ido-mode 1)
+; (setq ido-enable-flex-matching t)
+; (setq ido-everywhere t)
+(require 'helm-config)
+(global-set-key (kbd "C-x C-f") #'helm-find-files)
+(global-set-key (kbd "M-x") #'helm-M-x)
+(global-set-key (kbd "C-x r b") #'helm-filtered-bookmarks)
+(global-set-key (kbd "C-x b") #'helm-mini)
+(helm-mode 1)
+
+
 
 ; subwords
 (subword-mode 1)
@@ -92,7 +117,7 @@
            (local-file (file-relative-name
                         temp-file
                         (file-name-directory buffer-file-name))))
-      (list "~/.emacs.d/bin/pyflymake.py" (list local-file))))
+      (list (expand-file-name "~/.emacs.d/bin/pyflymake.py") (list local-file))))
       ;;     check path
 
   (add-to-list 'flymake-allowed-file-name-masks
@@ -199,12 +224,65 @@
             (setq-local electric-indent-mode nil)
 	    ))
 (global-set-key (kbd "C-x g") 'magit-status)
+(require 'magit-gitflow)
+(add-hook 'magit-mode-hook 'turn-on-magit-gitflow)
 
 (add-hook 'markdown-mode-hook 'turn-on-visual-line-mode)
 
+(defun mydired-sort ()
+  "Sort dired listings with directories first."
+  (save-excursion
+    (let (buffer-read-only)
+      (forward-line 2) ;; beyond dir. header 
+      (sort-regexp-fields t "^.*$" "[ ]*." (point) (point-max)))
+    (set-buffer-modified-p nil)))
+
+(defadvice dired-readin
+  (after dired-after-updating-hook first () activate)
+  "Sort dired listings with directories first before adding marks."
+  (mydired-sort))
 
 
+;; Behave like vi's O command
+(defun open-previous-line (arg)
+  "Open a new line before the current one. 
+     See also `newline-and-indent'."
+  (interactive "p")
+  (beginning-of-line)
+  (open-line arg)
+  (when newline-and-indent
+    (indent-according-to-mode)))
+(defvar newline-and-indent t
+  "Modify the behavior of the open-*-line functions to cause them to autoindent.")
+(global-set-key (kbd "M-o") 'open-previous-line)
 
+(require 'edit-server)
+(edit-server-start)
+
+; TODO fix this
+(setq org-crypt-key "08A19D14958B2044")
+(setq org-journal-enable-encryption t
+      org-journal-file-format "%Y-%m-%d.org")
+(require 'org-crypt)
+(org-crypt-use-before-save-magic)
+(setq org-tags-exclude-from-inheritance (quote ("crypt")))
+
+(require 'org-journal)
+
+(add-hook 'org-agenda-mode-hook
+          (lambda ()
+            (add-hook 'auto-save-hook 'org-save-all-org-buffers nil t)
+            (auto-save-mode)))
+
+(setq org-bullets-bullet-list '("◉" "◎" "⚫" "○" "►" "◇"))
+(add-hook 'org-mode-hook (lambda () (org-bullets-mode 1)))
+(add-hook 'org-mode-hook 'turn-on-flyspell)
+
+(defun hilite-todos ()
+  (highlight-lines-matching-regexp "\\<\\(FIXME\\|TODO):?" 
+       'hi-green-b)
+)
+(add-hook 'org-mode-hook 'hilite-todos)
 
 
 ; SYSTEM-TYPE config
