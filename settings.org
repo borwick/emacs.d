@@ -1,0 +1,678 @@
+#+TITLE: John's init.org
+
+#+BEGIN_SRC emacs-lisp
+(setq use-package-verbose t)
+#+END_SRC
+* Emacs environment
+** Directories/path setup
+
+#+BEGIN_SRC emacs-lisp
+(setq dotfiles-dir (expand-file-name "~/.emacs.d/"))
+(add-to-list 'load-path (concat dotfiles-dir "lisp/"))
+(add-to-list 'load-path (concat dotfiles-dir "elpa/"))
+#+END_SRC
+
+** Package setup
+*** Repositories
+#+BEGIN_SRC emacs-lisp
+(require 'package)
+(add-to-list 'package-archives
+	     '("melpa" . "http://melpa.milkbox.net/packages/")
+	     '("marmalade" .
+	       "http://marmalade-repo.org/packages/"))
+(add-to-list 'package-archives '("org" . "https://orgmode.org/elpa/") t)
+(package-initialize)
+#+END_SRC
+
+** Customize
+
+#+BEGIN_SRC emacs-lisp
+; custom files for M-x customize
+(setq custom-file (concat dotfiles-dir "custom.el"))
+(load custom-file)
+#+END_SRC
+
+** =use-package= and dependencies
+
+#+BEGIN_SRC emacs-lisp
+  (when (not (require 'use-package nil t))
+	  (package-refresh-contents)
+	  (package-install 'use-package))
+  (require 'use-package)
+  (require 'use-package-ensure)		;install packages by default
+  (setq use-package-always-ensure t)
+#+END_SRC
+
+Diminish will hide stuff from the mode line. Use-package supports =:diminsh= if diminish is supported.
+
+#+BEGIN_SRC emacs-lisp
+(use-package diminish)
+#+END_SRC
+
+** Subprocesses
+
+#+BEGIN_SRC emacs-lisp
+; server
+(server-start)
+(use-package edit-server
+  :config (edit-server-start))
+#+END_SRC
+
+** Helm
+
+#+BEGIN_SRC emacs-lisp
+(use-package helm
+  :diminish
+  :config
+  (progn
+    (require 'helm-config)
+    )
+  :bind (("C-x C-f" . helm-find-files)
+         ("M-x" . helm-M-x)
+	 ("C-x r b" . helm-filtered-bookmarks)
+	 ("C-x b" . 'helm-mini))
+  :config (progn
+            (helm-mode 1)))
+#+END_SRC
+
+#+BEGIN_SRC emacs-lisp
+(use-package helm-descbinds
+  :config (helm-descbinds-mode))
+#+END_SRC
+
+** Startup
+
+#+BEGIN_SRC emacs-lisp
+(setq inhibit-startup-message t
+      inhibit-startup-echo-area-message t)
+#+END_SRC
+
+** Backup file names
+#+BEGIN_SRC emacs-lisp
+(setq backup-directory-alist
+   `((".*" . ,temporary-file-directory)))
+(setq auto-save-file-name-transforms
+   `((".*" ,temporary-file-directory t)))
+#+END_SRC
+
+** Ask before closing
+
+#+BEGIN_SRC emacs-lisp
+; http://nileshk.com/2009/06/13/prompt-before-closing-emacs.html
+(defun ask-before-closing ()
+  "Ask whether or not to close, and then close if y was pressed"
+  (interactive)
+  (if (y-or-n-p (format "Are you sure you want to exit Emacs? "))
+      (if (< emacs-major-version 22)
+          (save-buffers-kill-terminal)
+        (save-buffers-kill-emacs))
+    (message "Canceled exit")))
+
+(when window-system
+  (global-set-key (kbd "C-x C-c") 'ask-before-closing))
+#+END_SRC
+
+** Nuke buffers
+
+#+BEGIN_SRC emacs-lisp
+; http://www-cdf.fnal.gov/~sthrlnd/emacs_help.html:
+;; Kills all them buffers except scratch
+;; obtained from http://www.chrislott.org/geek/emacs/dotemacs.xhtml
+(defun nuke-all-buffers ()
+  "kill all buffers, leaving *scratch* only"
+  (interactive)
+  (delete-other-frames)
+  (delete-other-windows)
+  (mapcar (lambda (x) (kill-buffer x))
+	  (buffer-list))
+  )
+#+END_SRC
+
+** Global revert
+
+#+BEGIN_SRC emacs-lisp
+; removing because I lost files due to this I think
+(global-auto-revert-mode t)
+
+#+END_SRC
+* Display and movement preferences
+** No easy keys
+#+BEGIN_SRC emacs-lisp
+(require 'no-easy-keys)
+(no-easy-keys 1)
+#+END_SRC
+
+** Subword mode
+#+BEGIN_SRC emacs-lisp
+(subword-mode 1)
+#+END_SRC
+
+** Only one space after period
+
+#+BEGIN_SRC emacs-lisp
+; FAQ 5.50--only one space after period
+(setq sentence-end-double-space nil)
+#+END_SRC
+
+** dired sort directories at top
+
+#+BEGIN_SRC emacs-lisp
+(defun mydired-sort ()
+  "Sort dired listings with directories first."
+  (save-excursion
+    (let (buffer-read-only)
+      (forward-line 2) ;; beyond dir. header 
+      (sort-regexp-fields t "^.*$" "[ ]*." (point) (point-max)))
+    (set-buffer-modified-p nil)))
+
+(defadvice dired-readin
+  (after dired-after-updating-hook first () activate)
+  "Sort dired listings with directories first before adding marks."
+  (mydired-sort))
+#+END_SRC
+** =M-o= to open previous line
+
+#+BEGIN_SRC emacs-lisp
+;; Behave like vi's O command
+(defun open-previous-line (arg)
+  "Open a new line before the current one. 
+     See also `newline-and-indent'."
+  (interactive "p")
+  (beginning-of-line)
+  (open-line arg)
+  (when newline-and-indent
+    (indent-according-to-mode)))
+(defvar newline-and-indent t
+  "Modify the behavior of the open-*-line functions to cause them to autoindent.")
+(global-set-key (kbd "M-o") 'open-previous-line)
+#+END_SRC
+
+** save-place-mode
+#+BEGIN_SRC emacs-lisp
+(save-place-mode 1)
+#+END_SRC
+
+** multiple cursors
+
+#+BEGIN_SRC emacs-lisp
+   (use-package multiple-cursors
+     :bind (("C-c m c" . 'mc/edit-lines))
+   )
+#+END_SRC
+* Modules
+** Newlines
+#+BEGIN_SRC emacs-lisp
+(setq require-final-newline t)
+#+END_SRC
+** Snippets
+
+#+BEGIN_SRC emacs-lisp
+(use-package yasnippet
+  :diminish yas-minor-mode
+  :config (yas-global-mode t)
+  )
+#+END_SRC
+** Flymake
+
+#+BEGIN_SRC emacs-lisp
+(require 'flymake)
+#+END_SRC
+
+** Git
+
+#+BEGIN_SRC emacs-lisp
+(use-package magit
+  :bind (("C-x g" . magit-status))
+  )
+; require is only so we can remove the vc hook:
+(require 'vc)
+(remove-hook 'find-file-hooks 'vc-find-file-hook)
+
+; TODO look into how to fix this to use =use-package=
+; (require 'magit-gitflow)
+; (add-hook 'magit-mode-hook 'turn-on-magit-gitflow)
+
+#+END_SRC
+
+** Python development
+
+*** Python-related modes
+#+BEGIN_SRC emacs-lisp
+(use-package pony-mode)
+(use-package virtualenvwrapper
+  :config
+  (venv-initialize-interactive-shells) ;; if you want interactive shell support
+  (venv-initialize-eshell) ;; if you want eshell support
+  (setq venv-location (expand-file-name "~/.virtualenvs/"))
+  (add-hook 'python-mode-hook (lambda ()
+                               (hack-local-variables)
+			       (venv-workon project-venv-name))))
+
+(use-package jedi
+  :config (add-hook 'python-mode-hook 'jedi:setup)
+  (setq jedi:setup-keys t)                      ; optional
+  (setq jedi:complete-on-dot t)                 ; optional
+  (jedi:setup))
+(require 'python)
+#+END_SRC
+
+** Django setup
+
+#+BEGIN_SRC emacs-lisp
+(set-variable 'python-fill-docstring-style 'django)
+#+END_SRC
+
+*** Python flymake rules
+#+BEGIN_SRC emacs-lisp
+; https://github.com/akaihola/flymake-python
+(when (load "flymake" t)
+  (defun flymake-pylint-init ()
+    (let* ((temp-file (flymake-init-create-temp-buffer-copy
+                       'flymake-create-temp-inplace))
+           (local-file (file-relative-name
+                        temp-file
+                        (file-name-directory buffer-file-name))))
+      (list (expand-file-name "~/.emacs.d/bin/pyflymake.py") (list local-file))))
+      ;;     check path
+
+  (add-to-list 'flymake-allowed-file-name-masks
+               '("\\.py\\'" flymake-pylint-init)))
+(add-hook 'find-file-hook 'flymake-find-file-hook)
+
+(defun flymake-html-init ())
+(defun flymake-simple-tex-init ())
+#+END_SRC
+
+** Editing modes
+
+#+BEGIN_SRC emacs-lisp
+(use-package markdown-mode
+  :config (add-hook 'markdown-mode-hook 'turn-on-visual-line-mode))
+(use-package graphviz-dot-mode)
+(use-package puppet-mode)
+(use-package yaml-mode)
+(use-package json-mode)
+(use-package puppet-mode
+  :mode (("\\.pp'" . puppet-mode)))
+(use-package dockerfile-mode
+  :mode (("Dockerfile\\'" . dockerfile-mode)))
+(use-package markdown-mode
+  :mode (("\\.md\\'" . markdown-mode)
+         ("\\.markdown\\'" . markdown-mode))
+  :config (setq markdown-command "multimarkdown")
+        (add-hook 'markdown-mode-hook
+          (lambda ()
+            ;; disable electric indent
+            (setq-local electric-indent-mode nil)
+	    )))
+(use-package php-mode
+  :mode (("\\.php\\'" . php-mode)
+         ("\\.inc\\'" . php-mode)))
+#+END_SRC
+
+** =org-mode=
+
+*** =org-mode= modules
+
+#+BEGIN_SRC emacs-lisp
+; https://blog.aaronbieber.com/2016/09/24/an-agenda-for-life-with-org-mode.html:
+(defun air-org-skip-subtree-if-habit ()
+  "Skip an agenda entry if it has a STYLE property equal to \"habit\"."
+  (let ((subtree-end (save-excursion (org-end-of-subtree t))))
+    (if (string= (org-entry-get nil "STYLE") "habit")
+        subtree-end
+      nil)))
+
+  (use-package org
+    :ensure org-plus-contrib
+    :config (add-hook 'org-mode-hook 'turn-on-flyspell)
+	  (add-hook 'org-mode-hook 'visual-line-mode)
+	  (setq org-src-fontify-natively t)
+	  (setq org-todo-keyword-faces
+	  '(("WORKING" . "orange")
+	  ("CANCELLED" . "grey")))
+	  (setq org-agenda-files (list "~/Dropbox/org/inbox.org"
+			   "~/Dropbox/org/plan.org"
+			   "~/Dropbox/org/main-todo.org"
+			   "~/Dropbox/org/now.org"
+			   "~/Dropbox/org/repeating.org"
+			   "~/Dropbox/org/projects.org"))
+	  (setq org-directory "~/Dropbox/org/")
+	  (setq org-capture-templates
+	  '(("t" "Todo [inbox]" entry
+	    (file+headline "~/Dropbox/org/inbox.org" "Tasks")
+	    "* TODO %i%?\n%a")
+	    ("T" "Todo [inbox, no link]" entry
+	    (file+headline "~/Dropbox/org/inbox.org" "Tasks")
+	    "* TODO %i%?\n")
+	    ("b" "Backlog" entry
+	    (file+headline "~/Dropbox/org/backlog.org" "Org-capture backlog")
+	    "* %i%?\n%a")
+	    ("B" "Backlog [no link]" entry
+	    (file+headline "~/Dropbox/org/backlog.org" "Org-capture backlog")
+	    "* %i%?\n")
+	    ("p" "Project" entry
+	    (file "~/Dropbox/org/projects.org")
+	    "* %i%?\n%a")
+	    ("P" "Project [no link]" entry
+	    (file "~/Dropbox/org/projects.org")
+	    "* %i%?\n"))
+
+	  (setq org-default-notes-file "~/Dropbox/org/inbox.org")
+	  (setq org-refile-targets '((("~/Dropbox/org/main-todo.org") :maxlevel . 1)
+	                             (("~/Dropbox/org/repeating.org") :maxlevel . 1)
+				     (("~/Dropbox/org/projects.org") :maxlevel . 1)
+				     (("~/Dropbox/org/backlog.org") :maxlevel . 1)
+				     (("~/Dropbox/org/now.org") :maxlevel . 1)
+				     ))
+          (setq org-export-with-section-numbers nil)
+	  (setq org-export-with-sub-superscripts nil)
+	  (setq org-todo-keywords
+	  '((sequence "TODO(t)" "WORKING(n)" "WAITING(w@/!)" "POSTPONED(p)" "|" "DONE(d)" "CANCELLED(c)")))
+	  (setq org-tag-alist '(("crypt" . ?x)
+                        (:startgroup . nil)
+			("home" . ?h)
+			("work" . ?w)
+			(:endgroup . nil)
+	))
+	(setq org-agenda-custom-commands
+	'(("w" "Work agenda"
+	    ; Priority A
+	   ((tags-todo "PRIORITY=\"A\"&-home"
+	    ((org-agenda-overriding-header "Priority A")))
+	    ; Due soon
+	    (tags-todo "-PRIORITY=\"A\"&DEADLINE<=\"<+7d>\"&-home&-TODO=\"WAITING\""
+	    ((org-agenda-overriding-header "Due soon")))
+	    ; Project list
+	    (tags "LEVEL=1&-home"
+	    ((org-agenda-files '("~/Dropbox/org/projects.org"))
+	     (org-agenda-overriding-header "Projects")))
+	     ; Tasks w/o deadline
+	    (tags-todo (concat "-home&-TODO=\"WAITING\"&-FILE=\""
+			       (expand-file-name "~/Dropbox/org/projects.org")
+			       "\"&-DEADLINE={.+}")
+	     ((org-agenda-skip-function '(air-org-skip-subtree-if-habit))
+	      (org-agenda-overriding-header "Tasks w/o deadlines")))
+	    ; Due later
+	    (tags-todo (concat "-home&-TODO=\"WAITING\"&DEADLINE>\"<+7d>\"")
+	     ((org-agenda-skip-function '(air-org-skip-subtree-if-habit))
+	      (org-agenda-overriding-header "Due later")))
+	    ; Habits
+	    (tags-todo "-home&STYLE=\"habit\""
+	     ((org-agenda-overriding-header "Habits")))
+	    ; Waiting tasks
+	    (tags-todo "-home&TODO=\"WAITING\""
+	     ((org-agenda-overriding-header "Waiting tasks"))))
+	    ((org-agenda-overriding-columns-format "%60ITEM %DEADLINE %TAGS")
+	     (org-agenda-view-columns-initially t)
+	     (org-agenda-compact-blocks t)
+	     (org-agenda-sorting-strategy '(deadline-up))))
+	    
+	'(("h" "Home agenda"
+	    ; Priority A
+	   ((tags-todo "PRIORITY=\"A\"&-work"
+	    ((org-agenda-overriding-header "Priority A")))
+	    ; Due soon
+	    (tags-todo "-PRIORITY=\"A\"&DEADLINE<=\"<+7d>\"&-work&-TODO=\"WAITING\""
+	    ((org-agenda-overriding-header "Due soon")))
+	    ; Project list
+	    (tags "LEVEL=1&-work"
+	    ((org-agenda-files '("~/Dropbox/org/projects.org"))
+	     (org-agenda-overriding-header "Projects")))
+	     ; Tasks w/o deadline
+	    (tags-todo (concat "-work&-TODO=\"WAITING\"&-FILE=\""
+			       (expand-file-name "~/Dropbox/org/projects.org")
+			       "\"&-DEADLINE={.+}")
+	     ((org-agenda-skip-function '(air-org-skip-subtree-if-habit))
+	      (org-agenda-overriding-header "Tasks w/o deadlines")))
+	    ; Due later
+	    (tags-todo (concat "-work&-TODO=\"WAITING\"&DEADLINE>\"<+7d>\"")
+	     ((org-agenda-skip-function '(air-org-skip-subtree-if-habit))
+	      (org-agenda-overriding-header "Due later")))
+	    ; Habits
+	    (tags-todo "-work&STYLE=\"habit\""
+	     ((org-agenda-overriding-header "Habits")))
+	    ; Waiting tasks
+	    (tags-todo "-work&TODO=\"WAITING\""
+	     ((org-agenda-overriding-header "Waiting tasks"))))
+	    ((org-agenda-overriding-columns-format "%60ITEM %DEADLINE %TAGS")
+	     (org-agenda-view-columns-initially t)
+	     (org-agenda-compact-blocks t)
+	     (org-agenda-sorting-strategy '(deadline-up))))
+
+
+	  ("W" "Waiting"
+	    ((todo "WAITING"))
+	   ((org-agenda-overriding-columns-format "%50ITEM %DEADLINE %TAGS")
+	    (org-agenda-view-columns-initially t)
+	    (org-agenda-compact-blocks t)
+	    (org-agenda-sorting-strategy '(deadline-up)))) ;; options set here apply to the entire block
+	    ))
+	  ;; ...other commands here
+
+	  (setq org-startup-folded nil)
+	  (setq org-log-into-drawer t)
+	  (setq org-enforce-todo-dependencies t)
+	  (add-to-list 'org-modules 'org-habit)
+	  (add-to-list 'org-modules 'org-checklist)
+	  (setq org-agenda-todo-ignore-scheduled 'future)
+	  (setq org-agenda-tags-todo-honor-ignore-options t)
+	  (setq org-agenda-skip-deadline-prewarning-if-scheduled t)
+	  (require 'org-checklist)
+	  (require 'org-crypt)
+	  (org-crypt-use-before-save-magic)
+	  (setq org-agenda-window-setup 'only-window)
+
+	  (require 'ox-beamer)
+
+	  ; (setq org-tags-exclude-from-inheritance (quote ("crypt")))
+  :bind (("C-c l" . org-store-link)
+         ("C-c a" . org-agenda)
+	 ("C-c c" . org-capture)
+	 :map org-mode-map
+	 ("C-c p" . org-panes-check-olivetti)
+	 ))
+
+  (use-package org-bullets
+   :config
+   (add-hook 'org-mode-hook (lambda () (org-bullets-mode 1))))
+  (use-package org-journal
+    :custom (org-journal-enable-encryption t)
+                (org-journal-encrypt-journal t)
+                (org-journal-file-type 'daily)
+		(org-journal-file-format "%Y-%m-%d.org")
+    :bind (("C-c j" . org-journal-new-entry))
+    )
+  (use-package org-mime
+    :config (add-hook 'message-mode-hook
+	    (lambda ()
+	     (local-set-key "\C-c\M-o" 'org-mime-htmlize))))
+  (use-package org-panes
+   :ensure nil
+   :config (setq org-panes-split-overview-horizontally t)
+	   (setq org-panes-main-size 70))
+  (use-package org-pomodoro
+   :config (setq org-pomodoro-manual-break t)
+   :bind (("C-c t" . org-pomodoro))
+   )
+#+END_SRC
+
+Olivetti and org-panes don't play together well. This function will disable olivetti-mode and then re-enable it after calling org-panes, if olivetti-mode was on.
+
+#+BEGIN_SRC emacs-lisp
+(defun org-panes-check-olivetti ()
+  (interactive)
+  (if (bound-and-true-p olivetti-mode)
+      (progn (olivetti-mode -1)
+             (org-panes)
+	     (olivetti-mode))
+       (org-panes)))
+#+END_SRC
+
+*** org-mode link type =jekyll-post=
+
+#+BEGIN_SRC emacs-lisp
+; thanks to https://cute-jumper.github.io/emacs/2013/10/06/orgmode-to-github-pages-with-jekyll
+(defun org-jekyll-post-link-follow (path)
+  (org-open-file-with-emacs path))
+
+(defun org-jekyll-post-link-export (path desc format)
+  (cond
+   ((eq format 'html)
+    (format "<a href=\"{%% post_url %s %%}\">%s</a>" (file-name-sans-extension path) desc))))
+
+(org-add-link-type "jekyll-post" 'org-jekyll-post-link-follow 'org-jekyll-post-link-export)
+#+END_SRC
+
+*** git-auto-commit
+
+I want to auto-commit org files, which I do via this module + a .dir-locals.el file in the org directory.
+
+#+BEGIN_SRC emacs-lisp
+(use-package git-auto-commit-mode)
+
+#+END_SRC
+
+*** org-wiki
+
+Install wiki:
+
+#+BEGIN_SRC emacs-lisp
+(when (not (require 'org-wiki nil t))
+      (let ((url "https://raw.githubusercontent.com/caiorss/org-wiki/master/org-wiki.el"))     
+          (with-current-buffer (url-retrieve-synchronously url)
+    	  (goto-char (point-min))
+	  (re-search-forward "^$")
+	  (delete-region (point) (point-min))
+	  (kill-whole-line)
+	  (package-install-from-buffer))
+	  (require 'org-wiki)))
+(setq org-wiki-location "~/Dropbox/jb.com/org/wiki")
+(org-wiki-make-menu)
+#+END_SRC
+
+Wiki template:
+
+#+begin_src emacs-lisp
+(setq org-wiki-template
+      (string-trim
+"
+#+BEGIN_EXPORT html
+---
+layout: wiki
+title: %n
+excerpt: 
+published: true
+---
+#+END_EXPORT
+
+* 
+"))
+#+end_src
+
+** Email
+
+#+BEGIN_SRC emacs-lisp
+(use-package bbdb)
+(use-package notmuch)
+(use-package ol-notmuch
+  :ensure nil
+  )
+(setq message-fill-column nil)
+(add-hook 'message-mode-hook #'visual-line-mode)
+
+(setq message-elide-ellipsis "[... %l line(s) removed ...]\n")
+(setq message-wash-forwarded-subjects t)
+(setq message-forward-before-signature nil)
+; TODO figure out how to turn off auto-fill-mode for message-mode/mml-mode
+#+END_SRC
+
+*** Polymode for org-mode email!
+
+#+BEGIN_SRC emacs-lisp
+; the "jb-" is to make sure there's no conflict if I ever use poly-org
+(use-package polymode
+  :config
+    (define-hostmode poly-mml-hostmode :mode 'notmuch-message-mode)
+    (define-innermode jb-poly-org-innermode
+      :mode 'org-mode
+      :head-matcher "^--text follows this line--$"
+      :tail-matcher "^THISNEVEREXISTS$"
+      :head-mode 'host
+      :tail-mode 'org-mode)
+    (define-polymode poly-org-mode
+      :hostmode 'poly-mml-hostmode
+      :innermodes '(jb-poly-org-innermode))
+    (add-hook 'mml-mode-hook
+      (lambda () (local-set-key (kbd "C-c o") #'poly-org-mode)))
+    )
+
+
+#+END_SRC
+
+** Focus and word count goals
+
+#+BEGIN_SRC emacs-lisp
+(use-package wc-goal-mode)
+(use-package olivetti-mode
+  :ensure nil
+  :bind ("C-c f" . olivetti-mode))
+#+END_SRC
+
+** Google
+#+BEGIN_SRC emacs-lisp
+(use-package google-this
+  :diminish
+  :config (google-this-mode 1)
+  )
+#+END_SRC
+
+* Custom emacs functions
+** random numbers
+#+BEGIN_SRC emacs-lisp
+; see https://stackoverflow.com/questions/37038441/generate-a-random-5-letternumber-string-at-cursor-point-all-lower-case
+(defun random-alnum ()
+  (let* ((alnum "abcdefghijklmnopqrstuvwxyz0123456789")
+         (i (% (abs (random)) (length alnum))))
+    (substring alnum i (1+ i))))
+
+(defun random-string (number)
+  "Generate a random string"
+  (interactive "p")
+  (dotimes (i number)
+    (insert (random-alnum))))
+#+END_SRC
+
+* Overrides
+
+This section goes from least- to most-specific, allowing other files to override the above and/or add other Emacs configuration.
+
+** OS-specific overrides
+
+#+BEGIN_SRC emacs-lisp
+
+; SYSTEM-TYPE config
+; (may change system-name)
+(setq system-type-as-string (replace-regexp-in-string "/" "-" (prin1-to-string system-type)))
+(setq system-type-specific-config (concat dotfiles-dir "system-type-specific/" system-type-as-string ".el"))
+(if (file-exists-p system-type-specific-config) (load system-type-specific-config))
+#+END_SRC
+
+** System-specific overrides
+#+BEGIN_SRC emacs-lisp
+; SYSTEM-NAME config
+(setq system-name-specific-config (concat dotfiles-dir "system-name-specific/" system-name ".el"))
+(if (file-exists-p system-name-specific-config) (load system-name-specific-config))
+#+END_SRC
+** Username-specific overrides
+#+BEGIN_SRC emacs-lisp
+; USER config
+(setq user-specific-config (concat dotfiles-dir "user-specific/" user-login-name ".el"))
+(if (file-exists-p user-specific-config) (load user-specific-config))
+#+END_SRC emacs-lisp
+** =local.el= overrides
+#+BEGIN_SRC emacs-lisp
+; LOCAL config
+(setq local-specific-config (concat dotfiles-dir "local.el"))
+(if (file-exists-p local-specific-config) (load local-specific-config))
+#+END_SRC

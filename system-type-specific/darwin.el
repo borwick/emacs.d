@@ -8,3 +8,9 @@
 	(package-install 'exec-path-from-shell))
       ))
 (exec-path-from-shell-initialize)
+
+(add-hook 'org-pomodoro-overtime-hook
+	  (lambda () (ns-do-applescript "display notification \"Pomodoro alert\"")))
+
+(add-hook 'org-pomodoro-break-finished-hook
+	  (lambda () (ns-do-applescript "display notification \"Break's over\"")))
