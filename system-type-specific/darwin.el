@@ -1,16 +1,26 @@
 ; darwin uses FQDN
 (setq system-name (car (split-string system-name "\\.")))
 
-(if (>= emacs-major-version 23)
-    (progn
-      (when (not (require 'exec-path-from-shell nil t))
-	(package-refresh-contents)
-	(package-install 'exec-path-from-shell))
-      ))
-(exec-path-from-shell-initialize)
+(setq alert-default-style 'notifier)
 
-(add-hook 'org-pomodoro-overtime-hook
-	  (lambda () (ns-do-applescript "display notification \"Pomodoro alert\"")))
+; use JuliaMono if it's installed
+(if (member "JuliaMono" (font-family-list))
+    (set-frame-font "JuliaMono-16" nil t)
+  (set-frame-font "Monaco-18" nil t))
 
-(add-hook 'org-pomodoro-break-finished-hook
-	  (lambda () (ns-do-applescript "display notification \"Break's over\"")))
+; required for delete-by-moving-to-trash to work
+(setq trash-directory "~/.Trash")
+
+; https://emacs.stackexchange.com/a/68568
+; -- fix for emacs package updates "error in process sentinel"
+(setq gnutls-algorithm-priority "NORMAL:-VERS-TLS1.3")
+
+; make insert key work
+; thanks to https://emacs.stackexchange.com/a/30288:
+(global-set-key [C-help] #'clipboard-kill-ring-save)
+(global-set-key [S-help] #'clipboard-yank)
+(global-set-key [help] #'overwrite-mode)
+
+; https://xenodium.com/my-emacs-eye-candy/
+(add-to-list 'default-frame-alist '(ns-transparent-titlebar . nil))
+(add-to-list 'default-frame-alist '(ns-appearance . dark))

@@ -6,22 +6,34 @@
 * Emacs environment
 ** Directories/path setup
 
+=dotfiles-dir= is now set in [[file:init.el][init.el]].
 #+BEGIN_SRC emacs-lisp
-(setq dotfiles-dir (expand-file-name "~/.emacs.d/"))
 (add-to-list 'load-path (concat dotfiles-dir "lisp/"))
 (add-to-list 'load-path (concat dotfiles-dir "elpa/"))
 #+END_SRC
 
 ** Package setup
+
+** Environment variables
+#+begin_src emacs-lisp
+(use-package exec-path-from-shell
+  :ensure t
+  :if (memq window-system '(mac ns x))
+  :config
+  (exec-path-from-shell-initialize))
+#+end_src
+
 *** Repositories
 #+BEGIN_SRC emacs-lisp
 (require 'package)
 (add-to-list 'package-archives
-	     '("melpa" . "http://melpa.milkbox.net/packages/")
+	     '("melpa" . "https://melpa.org/packages/")
 	     '("marmalade" .
 	       "http://marmalade-repo.org/packages/"))
-(add-to-list 'package-archives '("org" . "https://orgmode.org/elpa/") t)
-(package-initialize)
+(with-eval-after-load 'package (add-to-list 'package-archives '("nongnu" . "https://elpa.nongnu.org/nongnu/")))
+; (add-to-list 'package-archives '("org" . "https://orgmode.org/elpa/") t)
+; (package-refresh-contents)
+; (package-initialize)
 #+END_SRC
 
 ** Customize
@@ -35,38 +47,46 @@
 ** =use-package= and dependencies
 
 #+BEGIN_SRC emacs-lisp
-  (when (not (require 'use-package nil t))
-	  (package-refresh-contents)
-	  (package-install 'use-package))
-  (require 'use-package)
-  (require 'use-package-ensure)		;install packages by default
-  (setq use-package-always-ensure t)
+(when (not (require 'use-package nil t))
+  (package-refresh-contents)
+  (package-install 'use-package))
+(require 'use-package)
+(require 'use-package-ensure)		;install packages by default
+(setq use-package-always-ensure t)
 #+END_SRC
+
+** diminish plus stuff to diminish
 
 Diminish will hide stuff from the mode line. Use-package supports =:diminsh= if diminish is supported.
 
 #+BEGIN_SRC emacs-lisp
 (use-package diminish)
+(diminish 'eldoc-mode)
+(diminish 'visual-line-mode)
+(diminish 'flyspell-mode)
 #+END_SRC
+
 
 ** Subprocesses
 
 #+BEGIN_SRC emacs-lisp
-; server
+					; server
 (server-start)
 (use-package edit-server
   :config (edit-server-start))
 #+END_SRC
+
+** Hippie-expand
+
+#+begin_src emacs-lisp
+(global-set-key "\M-/" 'hippie-expand) 
+#+end_src
 
 ** Helm
 
 #+BEGIN_SRC emacs-lisp
 (use-package helm
   :diminish
-  :config
-  (progn
-    (require 'helm-config)
-    )
   :bind (("C-x C-f" . helm-find-files)
          ("M-x" . helm-M-x)
 	 ("C-x r b" . helm-filtered-bookmarks)
@@ -90,15 +110,15 @@ Diminish will hide stuff from the mode line. Use-package supports =:diminsh= if 
 ** Backup file names
 #+BEGIN_SRC emacs-lisp
 (setq backup-directory-alist
-   `((".*" . ,temporary-file-directory)))
+      `((".*" . ,temporary-file-directory)))
 (setq auto-save-file-name-transforms
-   `((".*" ,temporary-file-directory t)))
+      `((".*" ,temporary-file-directory t)))
 #+END_SRC
 
 ** Ask before closing
 
 #+BEGIN_SRC emacs-lisp
-; http://nileshk.com/2009/06/13/prompt-before-closing-emacs.html
+					; http://nileshk.com/2009/06/13/prompt-before-closing-emacs.html
 (defun ask-before-closing ()
   "Ask whether or not to close, and then close if y was pressed"
   (interactive)
@@ -110,12 +130,27 @@ Diminish will hide stuff from the mode line. Use-package supports =:diminsh= if 
 
 (when window-system
   (global-set-key (kbd "C-x C-c") 'ask-before-closing))
+
+
 #+END_SRC
+
+** Kill current buffer rather than prompt
+
+From http://pragmaticemacs.com/emacs/dont-kill-buffer-kill-this-buffer-instead/:
+
+   #+begin_src emacs-lisp
+(defun bjm/kill-this-buffer ()
+  "Kill the current buffer."
+  (interactive)
+  (kill-buffer (current-buffer)))
+
+(global-set-key (kbd "C-x k") 'bjm/kill-this-buffer)
+   #+end_src
 
 ** Nuke buffers
 
 #+BEGIN_SRC emacs-lisp
-; http://www-cdf.fnal.gov/~sthrlnd/emacs_help.html:
+					; http://www-cdf.fnal.gov/~sthrlnd/emacs_help.html:
 ;; Kills all them buffers except scratch
 ;; obtained from http://www.chrislott.org/geek/emacs/dotemacs.xhtml
 (defun nuke-all-buffers ()
@@ -131,31 +166,63 @@ Diminish will hide stuff from the mode line. Use-package supports =:diminsh= if 
 ** Global revert
 
 #+BEGIN_SRC emacs-lisp
-; removing because I lost files due to this I think
+					; removing because I lost files due to this I think
 (global-auto-revert-mode t)
 
 #+END_SRC
+** Unicode
+
+From https://www.masteringemacs.org/article/working-coding-systems-unicode-emacs:
+
+#+begin_src emacs-lisp
+(prefer-coding-system 'utf-8)
+(set-default-coding-systems 'utf-8)
+(set-terminal-coding-system 'utf-8)
+(set-keyboard-coding-system 'utf-8)
+;; backwards compatibility as default-buffer-file-coding-system
+;; is deprecated in 23.2.
+(if (boundp 'buffer-file-coding-system)
+    (setq-default buffer-file-coding-system 'utf-8)
+  (setq default-buffer-file-coding-system 'utf-8))
+
+;; Treat clipboard input as UTF-8 string first; compound text next, etc.
+(setq x-select-request-type '(UTF8_STRING COMPOUND_TEXT TEXT STRING))
+#+end_src
+** System clipboard
+   From http://pragmaticemacs.com/emacs/add-the-system-clipboard-to-the-emacs-kill-ring/:
+
+   #+begin_src emacs-lisp
+(setq save-interprogram-paste-before-kill t)
+   #+end_src
 * Display and movement preferences
+
 ** No easy keys
-#+BEGIN_SRC emacs-lisp
-(require 'no-easy-keys)
-(no-easy-keys 1)
-#+END_SRC
+
+Removed <2020-08-09 Sun> because I need M-up and M-down for org-mode reorganization
+
+# #+BEGIN_SRC emacs-lisp
+# (require 'no-easy-keys)
+# (no-easy-keys 1)
+# #+END_SRC
 
 ** Subword mode
 #+BEGIN_SRC emacs-lisp
 (subword-mode 1)
 #+END_SRC
 
-** Only one space after period
+** Whitespace
 
 #+BEGIN_SRC emacs-lisp
-; FAQ 5.50--only one space after period
+					; FAQ 5.50--only one space after period
 (setq sentence-end-double-space nil)
+
+					; http://pragmaticemacs.com/emacs/cycle-spacing/
+(global-set-key (kbd "M-SPC") 'cycle-spacing)
 #+END_SRC
 
-** dired sort directories at top
+** dired
 
+sort directories at the top:
 #+BEGIN_SRC emacs-lisp
 (defun mydired-sort ()
   "Sort dired listings with directories first."
@@ -166,10 +233,23 @@ Diminish will hide stuff from the mode line. Use-package supports =:diminsh= if 
     (set-buffer-modified-p nil)))
 
 (defadvice dired-readin
-  (after dired-after-updating-hook first () activate)
+    (after dired-after-updating-hook first () activate)
   "Sort dired listings with directories first before adding marks."
   (mydired-sort))
 #+END_SRC
+
+DWIM:
+
+#+begin_src emacs-lisp
+(setq dired-dwim-target t)
+#+end_src
+
+Guess shell commands using dired-x:
+
+#+begin_src emacs-lisp
+(require 'dired-x)
+#+end_src
+
 ** =M-o= to open previous line
 
 #+BEGIN_SRC emacs-lisp
@@ -195,10 +275,87 @@ Diminish will hide stuff from the mode line. Use-package supports =:diminsh= if 
 ** multiple cursors
 
 #+BEGIN_SRC emacs-lisp
-   (use-package multiple-cursors
-     :bind (("C-c m c" . 'mc/edit-lines))
-   )
+;; (use-package multiple-cursors
+;;   :bind (("C-c m c" . 'mc/edit-lines))
+;;   )
 #+END_SRC
+** unfill-paragraph
+#+begin_src emacs-lisp
+(defun unfill-paragraph ()
+  "Takes a multi-line paragraph and makes it into a single line of text."
+  (interactive)
+  (let ((fill-column (point-max)))
+    (fill-paragraph nil)))
+
+(define-key global-map "\C-\M-q" 'unfill-paragraph)
+#+end_src
+
+** scrolling
+
+From [[http://pragmaticemacs.com/emacs/scrolling-and-moving-by-line/][pragmatic emacs]]:
+
+#+begin_src emacs-lisp
+(setq scroll-preserve-screen-position 1)
+;;scroll window up/down by one line
+(global-set-key (kbd "M-n") (kbd "C-u 1 C-v"))
+(global-set-key (kbd "M-p") (kbd "C-u 1 M-v"))
+#+end_src
+** cursor display
+
+   Make tabs look bigger:
+
+   #+begin_src emacs-lisp
+(setq x-stretch-cursor t)
+   #+end_src
+** persistent scratch
+
+   #+begin_src emacs-lisp
+(use-package persistent-scratch
+  :config
+  (persistent-scratch-setup-default))
+   #+end_src
+** expand-region
+Per http://pragmaticemacs.com/emacs/expand-region/:
+
+   #+begin_src emacs-lisp
+(use-package expand-region
+  :bind (("C-=" . er/expand-region)))
+   #+end_src
+** unique buffer names
+
+   From http://pragmaticemacs.com/emacs/uniquify-your-buffer-names/:
+   #+begin_src emacs-lisp
+(require 'uniquify)
+(setq uniquify-buffer-name-style 'forward)
+(setq uniquify-separator "/")
+(setq uniquify-after-kill-buffer-p t)    ; rename after killing uniquified
+(setq uniquify-ignore-buffers-re "^\\*")
+ ; don't muck with special buffers
+   #+end_src
+** DWIM
+   #+begin_src emacs-lisp
+(global-set-key (kbd "M-u") 'upcase-dwim)
+(global-set-key (kbd "M-l") 'downcase-dwim)
+(global-set-key (kbd "M-c") 'capitalize-dwim)
+
+   #+end_src
+** the bell
+   Disable dinging on =C-g=
+
+   #+begin_src emacs-lisp
+ (setq visible-bell 1)
+
+   #+end_src
+** no tool bar
+#+begin_src emacs-lisp
+(tool-bar-mode -1)
+#+end_src
+** artist-mode no tabs
+
+#+begin_src emacs-lisp
+(add-hook 'artist-mode-hook (lambda () (setq indent-tabs-mode nil)))
+#+end_src
+
 * Modules
 ** Newlines
 #+BEGIN_SRC emacs-lisp
@@ -215,24 +372,64 @@ Diminish will hide stuff from the mode line. Use-package supports =:diminsh= if 
 ** Flymake
 
 #+BEGIN_SRC emacs-lisp
-(require 'flymake)
+(use-package flymake)
 #+END_SRC
 
 ** Git
 
+Magit TODOs:
+
+#+begin_src emacs-lisp
+(use-package magit-todos
+  :commands (magit-todos-mode)
+  :hook (magit-mode . magit-todos-mode)
+  :custom
+    (magit-todos-keywords (list "TODO" "FIXME"))
+    (magit-todos-keyword-suffix "")
+    (magit-todos-exclude-globs '("*_archive"))
+  :after magit)
+#+end_src
+
 #+BEGIN_SRC emacs-lisp
 (use-package magit
   :bind (("C-x g" . magit-status))
+  :config
+  (require 'vc)
+  (magit-todos-mode)
+  (remove-hook 'find-file-hooks 'vc-find-file-hook)
   )
-; require is only so we can remove the vc hook:
-(require 'vc)
-(remove-hook 'find-file-hooks 'vc-find-file-hook)
+					; require is only so we can remove the vc hook:
 
-; TODO look into how to fix this to use =use-package=
-; (require 'magit-gitflow)
-; (add-hook 'magit-mode-hook 'turn-on-magit-gitflow)
-
+;; (use-package magit-workflow
+;;   :ensure nil
+;;   :hook (magit-mode . turn-on-magit-workflow))
 #+END_SRC
+
+Link to Github etc via browse-at-remote! This is really neat!
+
+#+begin_src emacs-lisp
+(use-package browse-at-remote
+  :bind (("C-c g" . 'browse-at-remote))
+  )
+#+end_src
+
+
+** Development generally
+
+#+begin_src emacs-lisp
+; thanks https://emacs.stackexchange.com/a/55628/39670
+(defface hl-todo-TODO
+  '((t :background "#666600" :foreground "#ffffff" :inherit (hl-todo)))
+  "Face for highlighting TODO")
+
+(use-package hl-todo
+  :custom
+  (hl-todo-keyword-faces
+   '(("TODO" . hl-todo-TODO)
+     ("FIXME" . hl-todo-TODO)
+     ))
+  :hook ((prog-mode . hl-todo-mode)))
+#+end_src
 
 ** Python development
 
@@ -245,15 +442,15 @@ Diminish will hide stuff from the mode line. Use-package supports =:diminsh= if 
   (venv-initialize-eshell) ;; if you want eshell support
   (setq venv-location (expand-file-name "~/.virtualenvs/"))
   (add-hook 'python-mode-hook (lambda ()
-                               (hack-local-variables)
-			       (venv-workon project-venv-name))))
+				(hack-local-variables)
+				(venv-workon project-venv-name))))
 
 (use-package jedi
-  :config (add-hook 'python-mode-hook 'jedi:setup)
-  (setq jedi:setup-keys t)                      ; optional
-  (setq jedi:complete-on-dot t)                 ; optional
-  (jedi:setup))
-(require 'python)
+ :config (add-hook 'python-mode-hook 'jedi:setup)
+ (setq jedi:setup-keys t)                      ; optional
+ ; (setq jedi:complete-on-dot t)                 ; optional
+ (jedi:setup))
+(use-package python)
 #+END_SRC
 
 ** Django setup
@@ -298,13 +495,13 @@ Diminish will hide stuff from the mode line. Use-package supports =:diminsh= if 
   :mode (("Dockerfile\\'" . dockerfile-mode)))
 (use-package markdown-mode
   :mode (("\\.md\\'" . markdown-mode)
-         ("\\.markdown\\'" . markdown-mode))
+	 ("\\.markdown\\'" . markdown-mode))
   :config (setq markdown-command "multimarkdown")
-        (add-hook 'markdown-mode-hook
-          (lambda ()
-            ;; disable electric indent
-            (setq-local electric-indent-mode nil)
-	    )))
+  (add-hook 'markdown-mode-hook
+	    (lambda ()
+	      ;; disable electric indent
+	      (setq-local electric-indent-mode nil)
+	      )))
 (use-package php-mode
   :mode (("\\.php\\'" . php-mode)
          ("\\.inc\\'" . php-mode)))
@@ -314,188 +511,242 @@ Diminish will hide stuff from the mode line. Use-package supports =:diminsh= if 
 
 *** =org-mode= modules
 
+N.B. to make Apple's =afplay= quieter for org-mode, you'll need to set the bell value to ~/.emacs.d/quietbell.wav. Keywords: bell, loud, ear hurt, don't use =-v 100=. *You need to set both the finished bell and the overtime bell!*
+
+The quiet bell was generated by
+
+    ~ffmpeg -i loudbell.wav -filter:a "volume=-20dB" quietbell.wav~
+
+(First I tried to use afplay arguments to do this but I decided making a separate file was easier to understand.)
+
 #+BEGIN_SRC emacs-lisp
-; https://blog.aaronbieber.com/2016/09/24/an-agenda-for-life-with-org-mode.html:
+					; https://blog.aaronbieber.com/2016/09/24/an-agenda-for-life-with-org-mode.html:
 (defun air-org-skip-subtree-if-habit ()
   "Skip an agenda entry if it has a STYLE property equal to \"habit\"."
   (let ((subtree-end (save-excursion (org-end-of-subtree t))))
     (if (string= (org-entry-get nil "STYLE") "habit")
-        subtree-end
+	subtree-end
       nil)))
 
-  (use-package org
-    :ensure org-plus-contrib
-    :config (add-hook 'org-mode-hook 'turn-on-flyspell)
-	  (add-hook 'org-mode-hook 'visual-line-mode)
-	  (setq org-src-fontify-natively t)
-	  (setq org-todo-keyword-faces
-	  '(("WORKING" . "orange")
+(use-package org
+  :ensure org-contrib
+  :config (add-hook 'org-mode-hook 'turn-on-flyspell)
+  (add-hook 'org-mode-hook 'visual-line-mode)
+  (setq org-src-fontify-natively t)
+  (setq org-todo-keyword-faces
+	'(("WORKING" . "orange")
 	  ("CANCELLED" . "grey")))
-	  (setq org-agenda-files (list "~/Dropbox/org/inbox.org"
-			   "~/Dropbox/org/plan.org"
-			   "~/Dropbox/org/main-todo.org"
-			   "~/Dropbox/org/now.org"
-			   "~/Dropbox/org/repeating.org"
-			   "~/Dropbox/org/projects.org"))
-	  (setq org-directory "~/Dropbox/org/")
-	  (setq org-capture-templates
-	  '(("t" "Todo [inbox]" entry
-	    (file+headline "~/Dropbox/org/inbox.org" "Tasks")
-	    "* TODO %i%?\n%a")
-	    ("T" "Todo [inbox, no link]" entry
-	    (file+headline "~/Dropbox/org/inbox.org" "Tasks")
-	    "* TODO %i%?\n")
-	    ("b" "Backlog" entry
-	    (file+headline "~/Dropbox/org/backlog.org" "Org-capture backlog")
-	    "* %i%?\n%a")
-	    ("B" "Backlog [no link]" entry
-	    (file+headline "~/Dropbox/org/backlog.org" "Org-capture backlog")
-	    "* %i%?\n")
-	    ("p" "Project" entry
-	    (file "~/Dropbox/org/projects.org")
-	    "* %i%?\n%a")
-	    ("P" "Project [no link]" entry
-	    (file "~/Dropbox/org/projects.org")
-	    "* %i%?\n"))
+  (setq org-agenda-files (list "~/Dropbox/org/inbox.org"
+			       "~/Dropbox/org/plan.org"
+			       "~/Dropbox/org/main-todo.org"
+			       "~/Dropbox/org/now.org"
+			       "~/Dropbox/org/repeating.org"
+			       "~/Dropbox/org/projects.org"))
+  (setq org-directory "~/Dropbox/org/")
+  (setq org-capture-templates
+	'(("t" "Todo [inbox]" entry
+	   (file+headline "~/Dropbox/org/inbox.org" "Tasks")
+	   "* TODO %i%?\n%a")
+	  ("T" "Todo [inbox, no link]" entry
+	   (file+headline "~/Dropbox/org/inbox.org" "Tasks")
+	   "* TODO %i%?\n")
+	  ("b" "Backlog" entry
+	   (file+headline "~/Dropbox/org/backlog.org" "Org-capture backlog")
+	   "* %i%?\n%a")
+	  ("B" "Backlog [no link]" entry
+	   (file+headline "~/Dropbox/org/backlog.org" "Org-capture backlog")
+	   "* %i%?\n")
+	  ("p" "Project" entry
+	   (file "~/Dropbox/org/projects.org")
+	   "* %i%?\n%a")
+	  ("P" "Project [no link]" entry
+	   (file "~/Dropbox/org/projects.org")
+	   "* %i%?\n")
+	  ))
 
-	  (setq org-default-notes-file "~/Dropbox/org/inbox.org")
-	  (setq org-refile-targets '((("~/Dropbox/org/main-todo.org") :maxlevel . 1)
-	                             (("~/Dropbox/org/repeating.org") :maxlevel . 1)
-				     (("~/Dropbox/org/projects.org") :maxlevel . 1)
-				     (("~/Dropbox/org/backlog.org") :maxlevel . 1)
-				     (("~/Dropbox/org/now.org") :maxlevel . 1)
-				     ))
-          (setq org-export-with-section-numbers nil)
-	  (setq org-export-with-sub-superscripts nil)
-	  (setq org-todo-keywords
-	  '((sequence "TODO(t)" "WORKING(n)" "WAITING(w@/!)" "POSTPONED(p)" "|" "DONE(d)" "CANCELLED(c)")))
-	  (setq org-tag-alist '(("crypt" . ?x)
-                        (:startgroup . nil)
+  (setq org-default-notes-file "~/Dropbox/org/inbox.org")
+  (setq org-refile-targets '((("~/Dropbox/org/main-todo.org") :maxlevel . 1)
+			     (("~/Dropbox/org/repeating.org") :maxlevel . 1)
+			     (("~/Dropbox/org/projects.org") :maxlevel . 1)
+			     (("~/Dropbox/org/backlog.org") :maxlevel . 1)
+			     (("~/Dropbox/org/now.org") :maxlevel . 1)
+			     (("~/Dropbox/org/mom.org") :maxlevel . 1)
+			     ))
+  (setq org-export-with-section-numbers nil)
+  (setq org-export-with-sub-superscripts nil)
+  (setq org-todo-keywords
+	'((sequence "TODO(t)" "WORKING(n)" "WAITING(w@/!)" "POSTPONED(p)" "|" "DONE(d)" "CANCELLED(c)")))
+  (setq org-tag-alist '(("crypt" . ?x)
+			(:startgroup . nil)
 			("home" . ?h)
 			("work" . ?w)
+			("roamtodos" . ?r)
+			("defer" . ?d)
 			(:endgroup . nil)
-	))
-	(setq org-agenda-custom-commands
+			))
+  (setq org-agenda-custom-commands
 	'(("w" "Work agenda"
-	    ; Priority A
-	   ((tags-todo "PRIORITY=\"A\"&-home"
-	    ((org-agenda-overriding-header "Priority A")))
-	    ; Due soon
-	    (tags-todo "-PRIORITY=\"A\"&DEADLINE<=\"<+7d>\"&-home&-TODO=\"WAITING\""
-	    ((org-agenda-overriding-header "Due soon")))
-	    ; Project list
-	    (tags "LEVEL=1&-home"
-	    ((org-agenda-files '("~/Dropbox/org/projects.org"))
-	     (org-agenda-overriding-header "Projects")))
-	     ; Tasks w/o deadline
-	    (tags-todo (concat "-home&-TODO=\"WAITING\"&-FILE=\""
-			       (expand-file-name "~/Dropbox/org/projects.org")
-			       "\"&-DEADLINE={.+}")
-	     ((org-agenda-skip-function '(air-org-skip-subtree-if-habit))
-	      (org-agenda-overriding-header "Tasks w/o deadlines")))
-	    ; Due later
-	    (tags-todo (concat "-home&-TODO=\"WAITING\"&DEADLINE>\"<+7d>\"")
-	     ((org-agenda-skip-function '(air-org-skip-subtree-if-habit))
-	      (org-agenda-overriding-header "Due later")))
-	    ; Habits
-	    (tags-todo "-home&STYLE=\"habit\""
-	     ((org-agenda-overriding-header "Habits")))
-	    ; Waiting tasks
-	    (tags-todo "-home&TODO=\"WAITING\""
-	     ((org-agenda-overriding-header "Waiting tasks"))))
-	    ((org-agenda-overriding-columns-format "%60ITEM %DEADLINE %TAGS")
-	     (org-agenda-view-columns-initially t)
-	     (org-agenda-compact-blocks t)
-	     (org-agenda-sorting-strategy '(deadline-up))))
-	    
-	'(("h" "Home agenda"
-	    ; Priority A
-	   ((tags-todo "PRIORITY=\"A\"&-work"
-	    ((org-agenda-overriding-header "Priority A")))
-	    ; Due soon
-	    (tags-todo "-PRIORITY=\"A\"&DEADLINE<=\"<+7d>\"&-work&-TODO=\"WAITING\""
-	    ((org-agenda-overriding-header "Due soon")))
-	    ; Project list
-	    (tags "LEVEL=1&-work"
-	    ((org-agenda-files '("~/Dropbox/org/projects.org"))
-	     (org-agenda-overriding-header "Projects")))
-	     ; Tasks w/o deadline
-	    (tags-todo (concat "-work&-TODO=\"WAITING\"&-FILE=\""
-			       (expand-file-name "~/Dropbox/org/projects.org")
-			       "\"&-DEADLINE={.+}")
-	     ((org-agenda-skip-function '(air-org-skip-subtree-if-habit))
-	      (org-agenda-overriding-header "Tasks w/o deadlines")))
-	    ; Due later
-	    (tags-todo (concat "-work&-TODO=\"WAITING\"&DEADLINE>\"<+7d>\"")
-	     ((org-agenda-skip-function '(air-org-skip-subtree-if-habit))
-	      (org-agenda-overriding-header "Due later")))
-	    ; Habits
-	    (tags-todo "-work&STYLE=\"habit\""
-	     ((org-agenda-overriding-header "Habits")))
-	    ; Waiting tasks
-	    (tags-todo "-work&TODO=\"WAITING\""
-	     ((org-agenda-overriding-header "Waiting tasks"))))
-	    ((org-agenda-overriding-columns-format "%60ITEM %DEADLINE %TAGS")
-	     (org-agenda-view-columns-initially t)
-	     (org-agenda-compact-blocks t)
-	     (org-agenda-sorting-strategy '(deadline-up))))
+					; Priority A
+	   ((tags-todo "PRIORITY=\"A\"&-home&-roamtodos"
+		       ((org-agenda-overriding-header "Priority A")))
+					; Due soon
+	    (tags-todo "-PRIORITY=\"A\"&DEADLINE<=\"<+7d>\"&-home&-roamtodos&-TODO=\"WAITING\""
+		       ((org-agenda-overriding-header "Due soon")))
 
+					; Project list
+	    (tags "LEVEL=1&-home&-defer&SCHEDULED<=\"<+1d>\"|LEVEL=1&-home&-roamtodos&-defer-SCHEDULED={.}"
+		  ((org-agenda-files '("~/Dropbox/org/projects.org"))
+		   (org-agenda-overriding-header "Projects")))
+					; Tasks w/o deadline
+	    (tags-todo (concat "-PRIORITY=\"A\"&-home&-roamtodos&-defer&-TODO=\"WAITING\""
+			       ; "&-FILE=\"" (expand-file-name "~/Dropbox/org/projects.org") "\""
+			       "&-DEADLINE={.+}")
+		       ((org-agenda-skip-function '(air-org-skip-subtree-if-habit))
+			(org-agenda-overriding-header "Tasks w/o deadlines")))
 
-	  ("W" "Waiting"
-	    ((todo "WAITING"))
-	   ((org-agenda-overriding-columns-format "%50ITEM %DEADLINE %TAGS")
+					; Due later
+	    (tags-todo (concat "-home&-roamtodos&-TODO=\"WAITING\"&DEADLINE>\"<+7d>\"")
+		       ((org-agenda-skip-function '(air-org-skip-subtree-if-habit))
+			(org-agenda-overriding-header "Due later")))
+					; Habits
+	    (tags-todo "-home&-roamtodos&STYLE=\"habit\""
+		       ((org-agenda-overriding-header "Habits")))
+					; Waiting tasks
+	    (tags-todo "-home&-roamtodos&TODO=\"WAITING\""
+		       ((org-agenda-overriding-header "Waiting tasks"))))
+	   ((org-overriding-columns-format "%60ITEM %DEADLINE %TAGS")
 	    (org-agenda-view-columns-initially t)
 	    (org-agenda-compact-blocks t)
-	    (org-agenda-sorting-strategy '(deadline-up)))) ;; options set here apply to the entire block
-	    ))
-	  ;; ...other commands here
+	    (org-agenda-sorting-strategy '(deadline-up))))
 
-	  (setq org-startup-folded nil)
-	  (setq org-log-into-drawer t)
-	  (setq org-enforce-todo-dependencies t)
-	  (add-to-list 'org-modules 'org-habit)
-	  (add-to-list 'org-modules 'org-checklist)
-	  (setq org-agenda-todo-ignore-scheduled 'future)
-	  (setq org-agenda-tags-todo-honor-ignore-options t)
-	  (setq org-agenda-skip-deadline-prewarning-if-scheduled t)
-	  (require 'org-checklist)
-	  (require 'org-crypt)
-	  (org-crypt-use-before-save-magic)
-	  (setq org-agenda-window-setup 'only-window)
+	  ("h" "Home agenda"
+					; Priority A
+	   ((tags-todo "PRIORITY=\"A\"&-work&-roamtodos"
+		       ((org-agenda-overriding-header "Priority A")))
 
-	  (require 'ox-beamer)
+					; Due soon
+	    (tags-todo "-PRIORITY=\"A\"&DEADLINE<=\"<+7d>\"&-work&-roamtodos&-TODO=\"WAITING\""
+		       ((org-agenda-overriding-header "Due soon")))
+					; Project list
+	    (tags "LEVEL=1&-work&-roamtodos&-defer&SCHEDULED<=\"<+1d>\"|LEVEL=1&-work&-defer-SCHEDULED={.}"
+		  ((org-agenda-files '("~/Dropbox/org/projects.org"))
+		   (org-agenda-overriding-header "Projects")))
+					; Tasks w/o deadline
+	    (tags-todo (concat "-PRIORITY=\"A\"-work&-roamtodos&-defer&-TODO=\"WAITING\""
+			       ; "&-FILE=\"" (expand-file-name "~/Dropbox/org/projects.org") "\""
+			       "&-DEADLINE={.+}")
+		       ((org-agenda-skip-function '(air-org-skip-subtree-if-habit))
+			(org-agenda-overriding-header "Tasks w/o deadlines")))
+					; Due later
+	    (tags-todo (concat "-work&-roamtodos&-TODO=\"WAITING\"&DEADLINE>\"<+7d>\"")
+		       ((org-agenda-skip-function '(air-org-skip-subtree-if-habit))
+			(org-agenda-overriding-header "Due later")))
+					; Habits
+	    (tags-todo "-work&-roamtodos&STYLE=\"habit\""
+		       ((org-agenda-overriding-header "Habits")))
+					; Waiting tasks
+	    (tags-todo "-work&-roamtodos&TODO=\"WAITING\""
+		       ((org-agenda-overriding-header "Waiting tasks"))))
+	   ((org-overriding-columns-format "%60ITEM %DEADLINE %TAGS")
+	    (org-agenda-view-columns-initially t)
+	    (org-agenda-compact-blocks t)
+	    (org-agenda-sorting-strategy '(deadline-up))))
 
-	  ; (setq org-tags-exclude-from-inheritance (quote ("crypt")))
+	  ("W" "Waiting"
+	   ((todo "WAITING"))
+
+	   ((org-overriding-columns-format "%50ITEM %DEADLINE %TAGS")
+	    (org-agenda-view-columns-initially t)
+	    (org-agenda-compact-blocks t)
+	    (org-agenda-sorting-strategy '(deadline-up))))
+
+    	  ("r" "ROAM"
+	   ((tags-todo "roamtodos"))
+	   
+
+	   ((org-overriding-columns-format "%50ITEM %SCHEDULED %DEADLINE %CATEGORY")
+	    (org-agenda-view-columns-initially t)
+	    (org-agenda-compact-blocks t)
+	    (org-agenda-sorting-strategy '(scheduled-up)))) ;; options set here apply to the entire block
+    	   ))
+  ;; ...other commands here
+
+  (setq org-startup-folded nil)
+  (setq org-log-into-drawer t)
+  (setq org-enforce-todo-dependencies t)
+  (add-to-list 'org-modules 'org-habit)
+  (add-to-list 'org-modules 'org-checklist)
+  (setq org-agenda-todo-ignore-scheduled 'future)
+  (setq org-agenda-tags-todo-honor-ignore-options t)
+  (setq org-agenda-skip-deadline-prewarning-if-scheduled t)
+  (require 'org-checklist)
+  (require 'org-crypt)
+
+  (setq org-crypt-key "08A19D14958B2044")
+  (org-crypt-use-before-save-magic)
+  (setq org-agenda-window-setup 'only-window)
+  (setq org-clock-persist t)
+  (setq org-highlight-latex-and-related '(latex))
+  (require 'ox-beamer)
+  (setq org-export-with-toc nil)
+					; (setq org-tags-exclude-from-inheritance (quote ("crypt")))
+  (setq org-src-tab-acts-natively t)
+  (setq org-src-preserve-indentation t)
+  (setq org-clock-out-remove-zero-time-clocks t)
+  (setq org-id-method (quote uuidgen))
+  (setq org-use-speed-commands t)
+  (setq org-catch-invisible-edits 'error)
+  
   :bind (("C-c l" . org-store-link)
-         ("C-c a" . org-agenda)
+	 ("C-c a" . org-agenda)
 	 ("C-c c" . org-capture)
 	 :map org-mode-map
-	 ("C-c p" . org-panes-check-olivetti)
+	 ("C-c P" . org-panes-check-olivetti)
+	 ("C-'" . nil) ; don't bind C-' to org-cycle-agenda-files
 	 ))
 
-  (use-package org-bullets
-   :config
-   (add-hook 'org-mode-hook (lambda () (org-bullets-mode 1))))
-  (use-package org-journal
-    :custom (org-journal-enable-encryption t)
-                (org-journal-encrypt-journal t)
-                (org-journal-file-type 'daily)
-		(org-journal-file-format "%Y-%m-%d.org")
-    :bind (("C-c j" . org-journal-new-entry))
-    )
-  (use-package org-mime
-    :config (add-hook 'message-mode-hook
+ 
+ (add-hook 'org-mode-hook 'helm-mode)
+
+(use-package org-bullets
+  :config
+  (add-hook 'org-mode-hook (lambda () (org-bullets-mode 1))))
+(use-package org-journal
+  :custom (org-journal-encrypt-journal t)
+  (org-journal-file-type 'daily)
+  (org-journal-file-format "%Y-%m-%d.org")
+  :bind (("C-c j" . org-journal-new-entry))
+  )
+(use-package org-mime
+  :config (setq org-mime-export-options '(:preserve-breaks t))
+  (add-hook 'message-mode-hook
 	    (lambda ()
-	     (local-set-key "\C-c\M-o" 'org-mime-htmlize))))
-  (use-package org-panes
-   :ensure nil
-   :config (setq org-panes-split-overview-horizontally t)
-	   (setq org-panes-main-size 70))
-  (use-package org-pomodoro
-   :config (setq org-pomodoro-manual-break t)
-   :bind (("C-c t" . org-pomodoro))
-   )
+	      (local-set-key "\C-c\M-o" 'org-mime-htmlize))))
+(use-package org-panes
+  :ensure nil
+  :config (setq org-panes-split-overview-horizontally t)
+  (setq org-panes-main-size 70))
+
+; 2022-06-02 - alert was not installed so org-pomodoro was failing
+(use-package alert)
+(use-package org-pomodoro
+  :ensure nil
+  :custom
+    (org-pomodoro-manual-break t)
+  :bind (("C-c t" . org-pomodoro))
+  )
 #+END_SRC
+
+Adding org-mime HTML; thanks https://emacs.stackexchange.com/a/18331!
+
+#+begin_src emacs-lisp
+(add-hook 'org-mime-html-hook
+      (lambda ()
+        (goto-char (point-min))
+        (insert "<div style=\"font-family:Georgia,serif\">")
+        (goto-char (point-max))
+        (insert "</div>")))
+#+end_src
 
 Olivetti and org-panes don't play together well. This function will disable olivetti-mode and then re-enable it after calling org-panes, if olivetti-mode was on.
 
@@ -524,6 +775,33 @@ Olivetti and org-panes don't play together well. This function will disable oliv
 (org-add-link-type "jekyll-post" 'org-jekyll-post-link-follow 'org-jekyll-post-link-export)
 #+END_SRC
 
+*** org-mode link type =yt=
+
+From https://endlessparentheses.com/embedding-youtube-videos-with-org-mode-links.html:
+
+#+begin_src emacs-lisp
+(defvar yt-iframe-format
+  ;; You may want to change your width and height.
+  (concat "<iframe width=\"440\""
+          " height=\"335\""
+          " src=\"https://www.youtube.com/embed/%s\""
+          " frameborder=\"0\""
+          " allowfullscreen>%s</iframe>"))
+
+(org-add-link-type
+ "yt"
+ (lambda (handle)
+   (browse-url
+    (concat "https://www.youtube.com/embed/"
+            handle)))
+ (lambda (path desc backend)
+   (cl-case backend
+     (html (format yt-iframe-format
+                   path (or desc "")))
+     (latex (format "\href{%s}{%s}"
+                    path (or desc "video"))))))
+#+end_src
+
 *** git-auto-commit
 
 I want to auto-commit org files, which I do via this module + a .dir-locals.el file in the org directory.
@@ -535,87 +813,280 @@ I want to auto-commit org files, which I do via this module + a .dir-locals.el f
 
 *** org-wiki
 
+(Removed as of 2022-07-11 because I haven't been using the wiki.)
+
 Install wiki:
 
 #+BEGIN_SRC emacs-lisp
-(when (not (require 'org-wiki nil t))
-      (let ((url "https://raw.githubusercontent.com/caiorss/org-wiki/master/org-wiki.el"))     
-          (with-current-buffer (url-retrieve-synchronously url)
-    	  (goto-char (point-min))
-	  (re-search-forward "^$")
-	  (delete-region (point) (point-min))
-	  (kill-whole-line)
-	  (package-install-from-buffer))
-	  (require 'org-wiki)))
-(setq org-wiki-location "~/Dropbox/jb.com/org/wiki")
-(org-wiki-make-menu)
+;; (when (not (require 'org-wiki nil t))
+;;       (let ((url "https://raw.githubusercontent.com/caiorss/org-wiki/master/org-wiki.el"))     
+;;           (with-current-buffer (url-retrieve-synchronously url)
+;;     	  (goto-char (point-min))
+;; 	  (re-search-forward "^$")
+;; 	  (delete-region (point) (point-min))
+;; 	  (kill-whole-line)
+;; 	  (package-install-from-buffer))
+;; 	  (require 'org-wiki)))
+;; (setq org-wiki-location "~/Dropbox/jb.com/org/wiki")
+;; (org-wiki-make-menu)
 #+END_SRC
 
 Wiki template:
 
-#+begin_src emacs-lisp
-(setq org-wiki-template
-      (string-trim
-"
-#+BEGIN_EXPORT html
----
-layout: wiki
-title: %n
-excerpt: 
-published: true
----
-#+END_EXPORT
+/Removed <2020-12-15 Tue> because the template doesn't seem to work plus it makes the org-mode view of this file weird./
 
-* 
-"))
+*** org-roam
+
+#+begin_src emacs-lisp
+; This is outside use-package so this path can be overridden
+(setq org-roam-directory (expand-file-name "~/Dropbox/org-roam/"))
+
+ (use-package org-roam
+    :after org
+    :custom
+    (org-roam-mode-sections
+	  (list #'org-roam-backlinks-section
+		#'org-roam-reflinks-section
+		;; #'org-roam-unlinked-references-section
+		))
+    (org-roam-capture-templates
+          '(("d" "default" plain "%?" :target
+	    (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}
+
+- tags :: ")
+	    :unnarrowed t)))
+
+
+    ; thanks https://systemcrafters.net/build-a-second-brain-in-emacs/5-org-roam-hacks/
+    (defun org-roam-node-insert-immediate (arg &rest args)
+      (interactive "P")
+      (let ((args (cons arg args))
+            (org-roam-capture-templates (list (append (car org-roam-capture-templates)
+            '(:immediate-finish t)))))
+	(apply #'org-roam-node-insert args)))
+
+    :config
+    (org-roam-setup)
+    (defun org-roam-node-insert-immediate (arg &rest args)
+      (interactive "P")
+      (let ((args (cons arg args))
+            (org-roam-capture-templates (list (append (car org-roam-capture-templates)
+                '(:immediate-finish t)))))
+    (apply #'org-roam-node-insert args)))
+
+    ; https://github.com/org-roam/org-roam/issues/991#issuecomment-882010053
+    (add-to-list 'magit-section-initial-visibility-alist (cons 'org-roam-node-section 'hide))
+
+    :bind (("C-c n f" . org-roam-node-find)
+           ("C-c n r" . org-roam-node-random)		    
+           ("C-c n c" . org-roam-capture)
+           ("C-c n g" . org-roam-graph)
+           (:map org-mode-map
+                 (
+
+		  ("C-c n i" . org-roam-node-insert)
+		  ("C-c n I" . org-roam-node-insert-immediate)
+                  ("C-c n o" . org-id-get-create)
+                  ("C-c n t" . org-roam-tag-add)
+                  ("C-c n a" . org-roam-alias-add)
+		  ("C-c n l" . org-roam-buffer-toggle)	   
+		  ))))
+
 #+end_src
 
+**** org-roam buffer on by default
+
+This /allows/ you to show the org-roam buffer by default, if =tim/org-roam-buffer-auto-mode= is set.
+
+Thanks to https://github.com/org-roam/org-roam/issues/507#issuecomment-1448455131.
+#+begin_quote emacs-lisp
+(defun tim/org-roam-buffer-auto-toggle (frame)
+  "Ensure that org-roam buffer is visible iff frame contains an org-roam file."
+  (with-selected-frame frame
+    (when (xor
+           (eq 'visible (org-roam-buffer--visibility))
+           (seq-find
+            (lambda (window) (org-roam-buffer-p (window-buffer window)))
+            (window-list)))
+      (org-roam-buffer-toggle))))
+
+(define-minor-mode tim/org-roam-buffer-auto-mode
+  "Global minor mode for toggling the org-roam buffer automatically.
+
+When this global minor mode is enabled, then the org-roam backlink buffer is
+shown if and only if the current frame has a window with an org-roam file."
+  :global t
+  :lighter " OrgRoamBuf"
+  (if tim/org-roam-buffer-auto-mode
+    (add-hook 'window-buffer-change-functions 'tim/org-roam-buffer-auto-toggle)
+    (remove-hook 'window-buffer-change-functions 'tim/org-roam-buffer-auto-toggle)))
+
+    
+
+#+end_quote
+
+**** org-roam search w/ deft
+
+- thanks also to https://github.com/jrblevin/deft/issues/75#issuecomment-905031872
+#+begin_src emacs-lisp
+(use-package deft
+  ; :after org-roam
+  :init
+  (require 'org-roam)
+  :bind
+  (("C-c n d" . deft)
+   :map deft-mode-map
+   ("C-g" . quit-window))
+  :custom
+  (deft-recursive t)
+  (deft-use-filter-string-for-filename t)
+  (deft-default-extension "org")
+  (deft-directory org-roam-directory)
+
+  :config
+   (defun cm/deft-parse-title (file contents)
+    "Parse the given FILE and CONTENTS and determine the title.
+  If `deft-use-filename-as-title' is nil, the title is taken to
+  be the first non-empty line of the FILE.  Else the base name of the FILE is
+  used as title."
+      (let ((begin (string-match "^#\\+[tT][iI][tT][lL][eE]: .*$" contents)))
+	(if begin
+	    (string-trim (substring contents begin (match-end 0)) "#\\+[tT][iI][tT][lL][eE]: *" "[\n\t ]+")
+	  (deft-base-filename file))))
+  
+    (advice-add 'deft-parse-title :override #'cm/deft-parse-title)
+  
+    (setq deft-strip-summary-regexp
+	  (concat "\\("
+		  "[\n\t]" ;; blank
+		  "\\|^#\\+[[:alpha:]_]+:.*$" ;; org-mode metadata
+		  "\\|^:PROPERTIES:\n\\(.+\n\\)+:END:\n"
+		  "\\)")))
+
+#+end_src
+*** org clipboard
+Thanks very much to https://speechcode.com/blog/org-to-clipboard
+
+#+begin_src emacs-lisp
+(defun org-to-clipboard ()
+  "Convert the contents of the current buffer or region from Org
+mode to HTML.  Store the result in the clipboard."
+  (interactive)
+  (if (use-region-p)
+      (shell-command-on-region (region-beginning)
+                               (region-end)
+                               "org2clip")
+      (shell-command-on-region (point-min)
+                               (point-max)
+                               "org2clip")))
+#+end_src
+
+*** task macros
+
+    =archive-finished-tasks= macro:
+
+    #+begin_src emacs-lisp
+(fset 'archive-finished-tasks
+   (kmacro-lambda-form [?\C-c ?\C-x ?\C-a ?\C-\M-s ?* ?  ?\( ?D ?O ?N ?E ?| ?C ?A ?N ?C ?E ?L ?L ?E ?D ?\) return] 0 "%d"))
+#+end_src
+
+    =find-next-subtask= macro:
+    #+begin_src emacs-lisp
+(fset 'find-next-open-task
+   (kmacro-lambda-form [?\C-s ?\[ ?  ?\] return ?\C-u ?3 ?\C-l] 0 "%d"))
+(with-eval-after-load 'org
+  (bind-key "C-c C-x n" #'find-next-open-task org-mode-map))
+    #+end_src
+
+FIXME broken
+
+    #+begin_src emacs-lisp
+(fset 'schedule-now-plus-28-days
+   (kmacro-lambda-form [?\C-c ?\C-s ?. S-down S-down S-down S-down return] 0 "%d"))
+(add-hook 'org-agenda-mode-hook (lambda ()
+  (define-key org-agenda-mode-map (kbd "C-c >") 'schedule-now-plus-28-days)))
+
+    #+end_src
+
+*** org-protocol
+    #+begin_src emacs-lisp
+;(require 'org-protocol)
+    #+end_src
+
+    
 ** Email
 
 #+BEGIN_SRC emacs-lisp
-(use-package bbdb)
-(use-package notmuch)
-(use-package ol-notmuch
-  :ensure nil
+; (use-package bbdb)
+(use-package notmuch
+  :bind (("C-x E" . notmuch))
   )
+(eval-after-load 'notmuch-show
+  '(define-key notmuch-show-mode-map "`" 'notmuch-show-apply-tag-macro))
+
+(eval-after-load 'notmuch-search
+  '(define-key notmuch-search-mode-map "`" 'notmuch-search-apply-tag-macro))
+
+(use-package ol-notmuch)
 (setq message-fill-column nil)
 (add-hook 'message-mode-hook #'visual-line-mode)
 
 (setq message-elide-ellipsis "[... %l line(s) removed ...]\n")
 (setq message-wash-forwarded-subjects t)
 (setq message-forward-before-signature nil)
-; TODO figure out how to turn off auto-fill-mode for message-mode/mml-mode
+					; TODO figure out how to turn off auto-fill-mode for message-mode/mml-mode
+
+; add date to reply
+(setq message-citation-line-function 'message-insert-formatted-citation-line)
+(setq message-citation-line-format "On %A, %b %d %Y, %f wrote:\n")
+
 #+END_SRC
 
 *** Polymode for org-mode email!
 
 #+BEGIN_SRC emacs-lisp
-; the "jb-" is to make sure there's no conflict if I ever use poly-org
+					; the "jb-" is to make sure there's no conflict if I ever use poly-org
 (use-package polymode
   :config
-    (define-hostmode poly-mml-hostmode :mode 'notmuch-message-mode)
-    (define-innermode jb-poly-org-innermode
-      :mode 'org-mode
-      :head-matcher "^--text follows this line--$"
-      :tail-matcher "^THISNEVEREXISTS$"
-      :head-mode 'host
-      :tail-mode 'org-mode)
-    (define-polymode poly-org-mode
-      :hostmode 'poly-mml-hostmode
-      :innermodes '(jb-poly-org-innermode))
-    (add-hook 'mml-mode-hook
-      (lambda () (local-set-key (kbd "C-c o") #'poly-org-mode)))
-    )
-
-
+  (define-hostmode poly-mml-hostmode :mode 'notmuch-message-mode)
+  (define-innermode jb-poly-org-innermode
+    :mode 'org-mode
+    :head-matcher "--text follows this line--"
+    :tail-matcher "^THISNEVEREXISTS$"
+    :head-mode 'host
+    :tail-mode 'org-mode)
+  (define-polymode poly-org-mode
+    :hostmode 'poly-mml-hostmode
+    :innermodes '(jb-poly-org-innermode))
+  (add-hook 'mml-mode-hook
+	    (lambda () (local-set-key (kbd "C-c o") #'poly-org-mode)))
+  )
 #+END_SRC
+
+*** Confirm if sending without org-mime
+
+#+begin_src emacs-lisp
+(defun org-mime-search-for-multipart ()
+  "Searches for multipart code and prompts whether to send email"
+  (let ((found-multipart (save-excursion
+                           (save-restriction
+                             (widen)
+                             (goto-char (point-min))
+                             (search-forward "<#multipart type=alternative>" nil t)))))
+    (when (and (not found-multipart)
+               (not (y-or-n-p "org-mime-htmlize not called; send anyway?")))
+      (setq quit-flag t))))
+(add-hook 'message-send-hook 'org-mime-search-for-multipart)
+  ;; (defun mua-send-mime
+  ;;   (y-or-n-p "Send without org-mime?")
+  ;; )
+#+end_src
 
 ** Focus and word count goals
 
 #+BEGIN_SRC emacs-lisp
 (use-package wc-goal-mode)
-(use-package olivetti-mode
-  :ensure nil
+(use-package olivetti
   :bind ("C-c f" . olivetti-mode))
 #+END_SRC
 
@@ -626,6 +1097,104 @@ published: true
   :config (google-this-mode 1)
   )
 #+END_SRC
+
+** REST client
+
+#+begin_src emacs-lisp
+(use-package restclient)
+#+end_src
+
+** Projectile + helm-projectile
+   #+begin_src emacs-lisp
+     (use-package projectile
+       :diminish
+       :init
+       (projectile-mode +1)
+       (setq projectile-switch-project-action 'projectile-commander)
+       (setq projectile-current-project-on-switch 'keep)
+
+       :bind (:map projectile-mode-map
+		   ("s-p" . projectile-command-map)
+		   ("C-c p" . projectile-command-map)))
+
+      (use-package helm-projectile
+       :init
+       (helm-projectile-on)
+	)
+
+   #+end_src
+** imenu list
+
+  #+begin_src emacs-lisp
+    (use-package imenu-list
+     :init
+     (setq imenu-list-auto-resize t)
+     :bind (("C-'" . imenu-list-smart-toggle))
+	     )
+  #+end_src
+** crontab
+   #+begin_src emacs-lisp
+(use-package crontab-mode)
+   #+end_src
+
+** Perl regexes
+
+#+begin_src emacs-lisp
+(use-package pcre2el
+  :diminish 'pcre-mode
+  :config
+  (pcre-mode))
+#+end_src
+** System trash
+  #+begin_src emacs-lisp
+(setq delete-by-moving-to-trash t)
+  #+end_src
+
+** Shell linting
+
+#+begin_src emacs-lisp
+(use-package flymake-shellcheck
+  :commands flymake-shellcheck-load
+  :init
+  (add-hook 'sh-mode-hook 'flymake-shellcheck-load))
+
+#+end_src
+
+** Emacs macros
+
+FYI this needs the =h= register populated with the header to insert, which is:
+
+#+BEGIN_QUOTE
+    <head>
+    <style type="text/css">
+    </style>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+
+    <script language="javascript">
+      // thanks to https://stackoverflow.com/posts/18052837/revisions and
+      // https://stackoverflow.com/posts/30156191/revisions
+      $(function () {
+          $("textarea").each(function () {
+		  	  this.cols = "100";
+              this.style.height = (this.scrollHeight+10)+'px';
+          });
+          $("input[type='text']" ).each(function( index ) {
+    	  $(this).attr("size", $(this).val().length + 5 );
+          });
+      });
+    </script>
+    </head>
+#+END_QUOTE
+
+* Contact management
+** Vcard support
+
+#+begin_src emacs-lisp
+(use-package vcard-mode
+  :ensure nil
+  :mode "\\.vc\\(f\\|ard\\)\\'")
+#+end_src
+
 
 * Custom emacs functions
 ** random numbers
@@ -643,6 +1212,44 @@ published: true
     (insert (random-alnum))))
 #+END_SRC
 
+** insert date
+Adapted from https://www.emacswiki.org/emacs/InsertDate:
+
+ - =C-c d= inserts the date like =2021-05-03=
+ - =C-u C-c d= inserts the date like =Mon May  3 12:16:50 2021=
+
+   #+begin_src emacs-lisp
+  (defun insert-date (prefix)
+    "Insert the current date. With prefix-argument, use ISO format. With
+   two prefix arguments, write out the day and month name."
+    (interactive "P")
+    (let ((format (cond
+                   ((not prefix) "%Y-%m-%d")
+                   ((equal prefix '(4)) "%c")))
+          (system-time-locale "en_US"))
+      (insert (format-time-string format))))
+    (global-set-key (kbd "C-c d") 'insert-date)
+
+   #+end_src
+
+   #+begin_src emacs-lisp
+  (defun replace-body-with-reply-parser (&rest _)
+     (interactive)
+     (if (boundp 'reply-parser-program)
+	 (progn
+          (message-goto-body)
+	  (call-process-region
+	    (point); START
+	    (point-max); END
+	    "python"
+	    t t t
+	   (expand-file-name reply-parser-program))
+	   (message-goto-body))))
+
+   (advice-add 'notmuch-mua-new-reply :after
+	       #'replace-body-with-reply-parser)
+   #+end_src
+
 * Overrides
 
 This section goes from least- to most-specific, allowing other files to override the above and/or add other Emacs configuration.
@@ -653,26 +1260,37 @@ This section goes from least- to most-specific, allowing other files to override
 
 ; SYSTEM-TYPE config
 ; (may change system-name)
-(setq system-type-as-string (replace-regexp-in-string "/" "-" (prin1-to-string system-type)))
-(setq system-type-specific-config (concat dotfiles-dir "system-type-specific/" system-type-as-string ".el"))
-(if (file-exists-p system-type-specific-config) (load system-type-specific-config))
+(setq system-type-as-string
+      (replace-regexp-in-string "/" "-" (prin1-to-string system-type)))
+(setq system-type-specific-config
+      (concat dotfiles-dir "system-type-specific/" system-type-as-string ".el"))
+(if (file-exists-p system-type-specific-config)
+    (load system-type-specific-config))
 #+END_SRC
 
 ** System-specific overrides
 #+BEGIN_SRC emacs-lisp
 ; SYSTEM-NAME config
-(setq system-name-specific-config (concat dotfiles-dir "system-name-specific/" system-name ".el"))
-(if (file-exists-p system-name-specific-config) (load system-name-specific-config))
+(setq system-name-specific-config
+      (concat dotfiles-dir "system-name-specific/" (system-name) ".el"))
+(if (file-exists-p system-name-specific-config)
+    (load system-name-specific-config))
 #+END_SRC
+
 ** Username-specific overrides
+
 #+BEGIN_SRC emacs-lisp
 ; USER config
-(setq user-specific-config (concat dotfiles-dir "user-specific/" user-login-name ".el"))
-(if (file-exists-p user-specific-config) (load user-specific-config))
+
+(setq user-specific-config
+      (concat dotfiles-dir "user-specific/" user-login-name ".el"))
+(if (file-exists-p user-specific-config)
+    (load user-specific-config))
 #+END_SRC emacs-lisp
 ** =local.el= overrides
 #+BEGIN_SRC emacs-lisp
 ; LOCAL config
 (setq local-specific-config (concat dotfiles-dir "local.el"))
-(if (file-exists-p local-specific-config) (load local-specific-config))
+(if (file-exists-p local-specific-config)
+    (load local-specific-config))
 #+END_SRC

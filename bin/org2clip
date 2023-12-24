@@ -1,0 +1,4 @@
+#!/bin/bash
+# thanks to https://speechcode.com/blog/org-to-clipboard
+HEX=`pandoc --from=org --to=html | hexdump -ve '1/1 "%.2x"'`
+osascript -e "set the clipboard to «data HTML${HEX}»"
